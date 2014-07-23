@@ -1,3 +1,10 @@
+ssl_session_timeout  5m;
+ssl_protocols  TLSv1; #required by SNI
+ssl_ciphers  HIGH:!aNULL:!MD5;
+ssl_prefer_server_ciphers   on;
+ssl_certificate /etc/nginx/certs/server.crt;
+ssl_certificate_key /etc/nginx/certs/server.key;
+
 server {
 	listen 80 default_server;
 	server_name _; # This is just an invalid value which will never trigger on a real hostname.
@@ -40,14 +47,26 @@ upstream {{ $host }} {
 {{ end }}
 }
 
+{{ if ne $host "docker.arpinum.fr"}}
+server {
+      listen 80 ;
+      server_name {{ $host }};
+      ## redirect http to https ##
+      rewrite        ^ https://$server_name$request_uri? permanent;
+}
+{{ end }}
 server {
 	gzip_types text/plain text/css application/json application/x-javascript text/xml application/xml application/xml+rss text/javascript;
-
+	{{ if ne $host "docker.arpinum.fr"}}
+	ssl on;
+	listen 443 ssl;
+	{{ end }}
 	server_name {{ $host }};
 	proxy_buffering off;
 	error_log /proc/self/fd/2;
 	access_log /proc/self/fd/1;
 	{{ if eq $host "docker.arpinum.fr"}}
+	listen 80;
 	chunked_transfer_encoding on;
 	client_max_body_size 0;
 	proxy_set_header Host       $http_host;
